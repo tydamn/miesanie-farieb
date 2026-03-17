@@ -82,68 +82,19 @@ body { margin:0; background:var(--bg); color:var(--text); font-family:Arial,Helv
 
 </style>
 
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#0f1418">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Miešanie farieb">
-<link rel="apple-touch-icon" href="icon-192.png">
-<script src="version.js"></script>
+<link rel="apple-touch-icon" href="./icon-192.png">
 <style>
-  #update-banner {
-    position: fixed;
-    left: 12px;
-    right: 12px;
-    bottom: 24px;
-    z-index: 9999;
-    display: none;
-    background: linear-gradient(180deg, #9fbb88 0%, #89a874 100%);
-    color: #111;
-    border-radius: 16px;
-    padding: 12px 14px;
-    box-shadow: 0 10px 28px rgba(0,0,0,.28);
-    border: 1px solid rgba(0,0,0,.12);
-    font-family: Arial, Helvetica, sans-serif;
-  }
-  #update-banner .row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  #update-banner .text {
-    font-size: 14px;
-    line-height: 1.25;
-    font-weight: 700;
-  }
-  #update-banner .sub {
-    font-size: 12px;
-    color: rgba(17,17,17,.72);
-    margin-top: 4px;
-    font-weight: 600;
-  }
-  #update-banner button {
-    border: none;
-    border-radius: 12px;
-    background: #ddd2b8;
-    color: #111;
-    font-weight: 700;
-    padding: 10px 14px;
-    min-width: 96px;
-    box-shadow: 0 2px 0 rgba(0,0,0,.08);
-  }
-  #app-version {
-    position: fixed;
-    bottom: 6px;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 11px;
-    color: rgba(255,255,255,0.28);
-    pointer-events: none;
-    font-weight: 500;
-    z-index: 9998;
-  }
+#update-banner{position:fixed;left:12px;right:12px;bottom:24px;z-index:9999;display:none;background:linear-gradient(180deg,#9fbb88 0%,#89a874 100%);color:#111;border-radius:16px;padding:12px 14px;box-shadow:0 10px 28px rgba(0,0,0,.28);border:1px solid rgba(0,0,0,.12);font-family:Arial,Helvetica,sans-serif}
+#update-banner .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#update-banner .text{font-size:14px;line-height:1.25;font-weight:700}
+#update-banner .sub{font-size:12px;color:rgba(17,17,17,.72);margin-top:4px;font-weight:600}
+#update-banner button{border:none;border-radius:12px;background:#ddd2b8;color:#111;font-weight:700;padding:10px 14px;min-width:96px;box-shadow:0 2px 0 rgba(0,0,0,.08)}
+#app-version{position:fixed;bottom:6px;left:0;right:0;text-align:center;font-size:11px;color:rgba(255,255,255,0.28);pointer-events:none;font-weight:500;z-index:9998}
 </style>
 
 </head>
@@ -400,90 +351,13 @@ renderBrands();
 </div>
 <div id="app-version"></div>
 <script>
-  let __waitingWorker = null;
-
-  function currentAppVersion() {
-    return (typeof window !== "undefined" && window.APP_VERSION) ||
-           (typeof self !== "undefined" && self.APP_VERSION) ||
-           "v?";
-  }
-
-  function showAppVersion() {
-    const el = document.getElementById("app-version");
-    if (!el) return;
-    el.textContent = currentAppVersion();
-  }
-
-  function showUpdateBanner(currentVer, latestVer) {
-    const banner = document.getElementById('update-banner');
-    const sub = document.getElementById('update-banner-sub');
-    const btn = document.getElementById('update-refresh-btn');
-    if (!banner || !sub || !btn) return;
-
-    sub.textContent = `Aktuálna verzia: ${currentVer} • Nová verzia: ${latestVer}`;
-    banner.style.display = 'block';
-
-    btn.onclick = async () => {
-      try {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) await reg.update();
-      } catch (e) {
-        console.log('Update check failed:', e);
-      }
-
-      if (__waitingWorker) {
-        __waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-      } else {
-        window.location.reload();
-      }
-    };
-  }
-
-  async function fetchLatestVersion() {
-    const res = await fetch('./version.js?ts=' + Date.now(), { cache: 'no-store' });
-    const text = await res.text();
-    const match = text.match(/APP_VERSION\s*=\s*["']([^"']+)["']/);
-    return match ? match[1] : currentAppVersion();
-  }
-
-  async function checkVersionAndUpdates() {
-    showAppVersion();
-
-    try {
-      const reg = await navigator.serviceWorker.register('./service-worker.js');
-      await reg.update();
-
-      if (reg.waiting) __waitingWorker = reg.waiting;
-
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        if (!newWorker) return;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            __waitingWorker = newWorker;
-          }
-        });
-      });
-
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        window.location.reload();
-      });
-
-      const latestVer = await fetchLatestVersion();
-      const currentVer = currentAppVersion();
-      if (latestVer !== currentVer) {
-        showUpdateBanner(currentVer, latestVer);
-      }
-    } catch (err) {
-      console.log('Version/update check failed:', err);
-    }
-  }
-
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', checkVersionAndUpdates);
-  } else {
-    window.addEventListener('load', showAppVersion);
-  }
+window.APP_VERSION = "v?"; let __waitingWorker = null;
+async function loadVersion(){try{const r=await fetch('./version.js?ts='+Date.now(),{cache:'no-store'});const t=await r.text();const m=t.match(/APP_VERSION\s*=\s*["']([^"']+)["']/);if(m)window.APP_VERSION=m[1]}catch(e){console.log('Version load failed:',e)}}
+function showAppVersion(){const el=document.getElementById('app-version'); if(el) el.textContent=window.APP_VERSION||'v?';}
+function showUpdateBanner(currentVer,latestVer){const banner=document.getElementById('update-banner');const sub=document.getElementById('update-banner-sub');const btn=document.getElementById('update-refresh-btn');if(!banner||!sub||!btn)return;sub.textContent=`Aktuálna verzia: ${currentVer} • Nová verzia: ${latestVer}`;banner.style.display='block';btn.onclick=async()=>{try{const reg=await navigator.serviceWorker.getRegistration('./');if(reg)await reg.update()}catch(e){console.log('Update check failed:',e)}if(__waitingWorker){__waitingWorker.postMessage({type:'SKIP_WAITING'})}else{window.location.reload()}}}
+async function fetchLatestVersion(){const r=await fetch('./version.js?ts='+Date.now(),{cache:'no-store'});const t=await r.text();const m=t.match(/APP_VERSION\s*=\s*["']([^"']+)["']/);return m?m[1]:(window.APP_VERSION||'v?')}
+async function bootPWA(){await loadVersion();showAppVersion();if(!('serviceWorker' in navigator))return;try{const reg=await navigator.serviceWorker.register('./service-worker.js',{scope:'./'});await reg.update();if(reg.waiting)__waitingWorker=reg.waiting;reg.addEventListener('updatefound',()=>{const nw=reg.installing;if(!nw)return;nw.addEventListener('statechange',()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller){__waitingWorker=nw}})});navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());const latestVer=await fetchLatestVersion();const currentVer=window.APP_VERSION||'v?';if(latestVer!==currentVer)showUpdateBanner(currentVer,latestVer)}catch(err){console.log('PWA boot failed:',err)}}
+window.addEventListener('load',bootPWA);
 </script>
 
 </body>
