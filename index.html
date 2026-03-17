@@ -94,6 +94,7 @@ body { margin:0; background:var(--bg); color:var(--text); font-family:Arial,Helv
 }
 
 </style>
+<script src="version.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -343,7 +344,10 @@ function showAppVersion(){
   const el = document.getElementById("app-version");
   if(!el) return;
 
-  const v = window.APP_VERSION || "v?";
+  const v =
+    (typeof window !== "undefined" && window.APP_VERSION) ||
+    (typeof self !== "undefined" && self.APP_VERSION) ||
+    "v?";
   el.textContent = v;
 }
 window.addEventListener("load", showAppVersion);
