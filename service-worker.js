@@ -3,6 +3,7 @@ const URLS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
+  './version.json',
   './icon-192.png',
   './icon-512.png'
 ];
@@ -25,6 +26,13 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+
+  if (url.pathname.endsWith('/version.json')) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request))
   );
