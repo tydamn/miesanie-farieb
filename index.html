@@ -132,6 +132,7 @@ body { margin:0; background:var(--bg); color:var(--text); font-family:Arial,Helv
     box-shadow: 0 2px 0 rgba(0,0,0,.08);
   }
 </style>
+<script src="version.js"></script>
 
 </head>
 <body>
@@ -376,19 +377,16 @@ document.getElementById("detailHomeBtn").addEventListener("click", showBrands);
 renderBrands();
 </script>
 
-
 <div id="update-banner">
   <div class="row">
     <div>
-      <div class="text" id="update-banner-title">Dostupná nová verzia appky</div>
+      <div class="text">Dostupná nová verzia appky</div>
       <div class="sub" id="update-banner-sub">Aktuálna verzia: — • Nová verzia: —</div>
     </div>
     <button id="update-refresh-btn">Obnoviť</button>
   </div>
 </div>
-
 <script>
-  window.APP_VERSION = "v1";
   let __waitingWorker = null;
 
   function showUpdateBanner(currentVer, latestVer) {
@@ -403,9 +401,7 @@ renderBrands();
     btn.onclick = async () => {
       try {
         const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          await reg.update();
-        }
+        if (reg) await reg.update();
       } catch (e) {
         console.log('Update check failed:', e);
       }
@@ -418,14 +414,19 @@ renderBrands();
     };
   }
 
+  async function fetchLatestVersion() {
+    const res = await fetch('./version.js?ts=' + Date.now(), { cache: 'no-store' });
+    const text = await res.text();
+    const match = text.match(/APP_VERSION\s*=\s*["']([^"']+)["']/);
+    return match ? match[1] : (window.APP_VERSION || 'v?');
+  }
+
   async function checkVersionAndUpdates() {
     try {
       const reg = await navigator.serviceWorker.register('./service-worker.js');
       await reg.update();
 
-      if (reg.waiting) {
-        __waitingWorker = reg.waiting;
-      }
+      if (reg.waiting) __waitingWorker = reg.waiting;
 
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
@@ -441,12 +442,10 @@ renderBrands();
         window.location.reload();
       });
 
-      const res = await fetch('./version.json?ts=' + Date.now(), { cache: 'no-store' });
-      const data = await res.json();
-      const latestVer = data.version || window.APP_VERSION;
-
-      if (latestVer !== window.APP_VERSION) {
-        showUpdateBanner(window.APP_VERSION, latestVer);
+      const latestVer = await fetchLatestVersion();
+      const currentVer = window.APP_VERSION || 'v?';
+      if (latestVer !== currentVer) {
+        showUpdateBanner(currentVer, latestVer);
       }
     } catch (err) {
       console.log('Version/update check failed:', err);

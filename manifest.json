@@ -1,7 +1,7 @@
 {
   "name": "Miešanie farieb",
   "short_name": "Farby",
-  "description": "Miešanie farieb - verzia v1",
+  "description": "Miešanie farieb",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f1418",
