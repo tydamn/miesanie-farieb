@@ -1,5 +1,5 @@
-const CACHE_NAME = 'miesanie-farieb-v1';
-const URLS_TO_CACHE = [
+const CACHE_NAME = 'miesanie-farieb-runtime-v2';
+const URLS_TO_PRECACHE = [
   './',
   './index.html',
   './manifest.json',
@@ -10,8 +10,9 @@ const URLS_TO_CACHE = [
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(URLS_TO_CACHE))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(URLS_TO_PRECACHE))
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
@@ -28,13 +29,33 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  if (url.pathname.endsWith('/version.json')) {
-    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+  const networkFirst =
+    event.request.mode === 'navigate' ||
+    url.pathname.endsWith('/index.html') ||
+    url.pathname.endsWith('/manifest.json') ||
+    url.pathname.endsWith('/version.json');
+
+  if (networkFirst) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' })
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match(event.request).then(cached => cached))
+    );
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
+    caches.match(event.request).then(cached => {
+      return cached || fetch(event.request).then(response => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        return response;
+      });
+    })
   );
 });
 

@@ -393,102 +393,110 @@ renderBrands();
 </script>
 
 
+
 <div id="update-banner">
   <div class="row">
     <div>
-      <div class="text" id="update-banner-title">Dostupná nová verzia appky</div>
+      <div class="text">Dostupná nová verzia appky</div>
       <div class="sub" id="update-banner-sub">Aktuálna verzia: — • Nová verzia: —</div>
     </div>
     <button id="update-refresh-btn">Obnoviť</button>
   </div>
 </div>
 
+<div id="app-version"></div>
+
 <script>
-  window.APP_VERSION = "v1";
-  let __waitingWorker = null;
+const VERSION_STORAGE_KEY = "mf_installed_version";
 
-  function showUpdateBanner(currentVer, latestVer) {
-    const banner = document.getElementById('update-banner');
-    const sub = document.getElementById('update-banner-sub');
-    const btn = document.getElementById('update-refresh-btn');
-    if (!banner || !sub || !btn) return;
+function setInstalledVersion(v) {
+  try { localStorage.setItem(VERSION_STORAGE_KEY, v); } catch (e) {}
+}
 
-    sub.textContent = `Aktuálna verzia: ${currentVer} • Nová verzia: ${latestVer}`;
-    banner.style.display = 'block';
+function getInstalledVersion() {
+  try { return localStorage.getItem(VERSION_STORAGE_KEY); } catch (e) { return null; }
+}
 
-    btn.onclick = async () => {
-      try {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          await reg.update();
+async function fetchServerVersion() {
+  const res = await fetch('./version.json?ts=' + Date.now(), { cache: 'no-store' });
+  const data = await res.json();
+  return data.version || "v2";
+}
+
+function renderFooterVersion(v) {
+  const el = document.getElementById("app-version");
+  if (!el) return;
+  el.textContent = v || "v?";
+}
+
+function showUpdateBanner(currentVer, latestVer) {
+  const banner = document.getElementById('update-banner');
+  const sub = document.getElementById('update-banner-sub');
+  const btn = document.getElementById('update-refresh-btn');
+  if (!banner || !sub || !btn) return;
+
+  sub.textContent = `Aktuálna verzia: ${currentVer} • Nová verzia: ${latestVer}`;
+  banner.style.display = 'block';
+
+  btn.onclick = async () => {
+    setInstalledVersion(latestVer);
+
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        await reg.update();
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
         }
-      } catch (e) {
-        console.log('Update check failed:', e);
       }
+    } catch (e) {
+      console.log('Update check failed:', e);
+    }
 
-      if (__waitingWorker) {
-        __waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-      } else {
-        window.location.reload();
-      }
-    };
+    window.location.reload();
+  };
+}
+
+async function bootAppVersion() {
+  let serverVersion = "v2";
+  try {
+    serverVersion = await fetchServerVersion();
+  } catch (e) {
+    console.log('Version fetch failed:', e);
   }
 
-  async function checkVersionAndUpdates() {
+  let installedVersion = getInstalledVersion();
+
+  if (!installedVersion) {
+    installedVersion = serverVersion;
+    setInstalledVersion(installedVersion);
+  }
+
+  renderFooterVersion(installedVersion);
+
+  if (serverVersion !== installedVersion) {
+    showUpdateBanner(installedVersion, serverVersion);
+  }
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
     try {
       const reg = await navigator.serviceWorker.register('./service-worker.js');
       await reg.update();
 
-      if (reg.waiting) {
-        __waitingWorker = reg.waiting;
-      }
-
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        if (!newWorker) return;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            __waitingWorker = newWorker;
-          }
-        });
-      });
-
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         window.location.reload();
       });
-
-      const res = await fetch('./version.json?ts=' + Date.now(), { cache: 'no-store' });
-      const data = await res.json();
-      const latestVer = data.version || window.APP_VERSION;
-
-      if (latestVer !== window.APP_VERSION) {
-        showUpdateBanner(window.APP_VERSION, latestVer);
-      }
     } catch (err) {
-      console.log('Version/update check failed:', err);
+      console.log('SW registration failed:', err);
     }
-  }
 
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', checkVersionAndUpdates);
-  }
-</script>
-
-
-<div id="app-version"></div>
-<script>
-async function showAppVersion(){
-  const el = document.getElementById("app-version");
-  if(!el) return;
-  try{
-    const res = await fetch('./version.json?ts=' + Date.now(), { cache: 'no-store' });
-    const data = await res.json();
-    el.textContent = data.version || data.label_current || "v?";
-  }catch(e){
-    el.textContent = "v?";
-  }
+    await bootAppVersion();
+  });
+} else {
+  window.addEventListener('load', bootAppVersion);
 }
-window.addEventListener("load", showAppVersion);
 </script>
 
 </body>
